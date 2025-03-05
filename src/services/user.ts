@@ -13,8 +13,7 @@ export interface GetUserTokenPayload {
   password: string;
 }
 
-const JWT_SECRET = "mysecret";
-
+const JWT_SECRET = process.env.JWT_SECRET;
 class UserService {
   private static async getUserByEmail(email: string) {
     return await prismaClient.user.findUnique({
@@ -27,6 +26,10 @@ class UserService {
       .digest("hex");
     return hashedPassword;
   }
+  public static async decodeJWTToken(token: string) {
+    return await JWT.verify(token, JWT_SECRET!);
+  }
+
   public static createUser(payload: CreateUserPayload) {
     const { firstName, lastName, email, password } = payload;
     const salt = randomBytes(16).toString("hex");
@@ -42,6 +45,12 @@ class UserService {
     });
   }
 
+  public static getUserById(id: string) {
+    return prismaClient.user.findUnique({
+      where: { id },
+    });
+  }
+
   public static async getUserToken(payload: GetUserTokenPayload) {
     const { email, password } = payload;
     const user = await this.getUserByEmail(email);
@@ -53,7 +62,9 @@ class UserService {
     if (hashedPassword !== user.password) {
       throw new Error("Invalid  password");
     }
-    const token = JWT.sign({ email }, JWT_SECRET, { expiresIn: "1h" });
+    const token = JWT.sign({ email, id: user.id }, JWT_SECRET!, {
+      expiresIn: "1h",
+    });
     return token;
   }
 }
